@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Školní banner</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="kiosk">
+  <main class="home home-nine">
+    <header class="school-header">
+      <div class="logo-mark">SŠ</div>
+      <div class="school-name">
+        <strong>STŘEDNÍ ŠKOLA</strong>
+        <span>STRAVOVÁNÍ A SLUŽEB</span>
+        <small>KARLOVY VARY</small>
+      </div>
+    </header>
+
+    <section class="dashboard-body">
+      <section class="photo-grid clean-photo-grid" aria-hidden="true">
+        <img src="{{ url_for('static', filename='img/chef.jpg') }}" alt="">
+        <img src="{{ url_for('static', filename='img/waiter.jpg') }}" alt="">
+        <img src="{{ url_for('static', filename='img/hairdresser.jpg') }}" alt="">
+        <img src="{{ url_for('static', filename='img/pastry.jpg') }}" alt="">
+      </section>
+
+      <section class="menu-grid nine-slots" aria-label="Hlavní nabídka">
+        <a class="tile active" href="{{ url_for('rozvrhy') }}">
+          <span class="calendar-icon" aria-hidden="true">▦</span>
+          <strong>ROZVRHY</strong>
+          <small>Zobrazit rozvrh hodin</small>
+        </a>
+        <a class="tile instagram-tile" href="{{ url_for('instagram') }}">
+          <span class="instagram-icon" aria-hidden="true">◎</span>
+          <strong>INSTAGRAM</strong>
+          <small>Novinky ze školy</small>
+        </a>
+        <a class="tile rules-tile" href="{{ url_for('skolni_rady') }}">
+          <span class="rules-icon" aria-hidden="true">▤</span>
+          <strong>ŠKOLNÍ ŘÁDY</strong>
+          <small>Školní řád a pravidla hodnocení</small>
+        </a>
+        {% for _ in range(6) %}
+        <div class="tile placeholder"><b>+</b></div>
+        {% endfor %}
+      </section>
+    </section>
+  </main>
+</body>
+</html>

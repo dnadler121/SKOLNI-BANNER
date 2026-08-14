@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Školní řády</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="kiosk rules-screen">
+  <header class="rules-topbar">
+    <a class="back" href="{{ url_for('index') }}">← ZPĚT</a>
+    <h1>ŠKOLNÍ ŘÁDY</h1>
+  </header>
+  <nav class="rules-tabs" aria-label="Výběr dokumentu">
+    <button class="rules-tab active" data-doc="school">ŠKOLNÍ ŘÁD</button>
+    <button class="rules-tab" data-doc="grading">PRAVIDLA HODNOCENÍ</button>
+  </nav>
+  <main class="rules-viewer">
+    <iframe id="school" class="rules-document active" title="Školní řád" src="{{ url_for('static', filename='docs/skolni-rad.pdf') }}#toolbar=0&navpanes=0"></iframe>
+    <iframe id="grading" class="rules-document" title="Pravidla hodnocení" src="{{ url_for('static', filename='docs/pravidla-hodnoceni.pdf') }}#toolbar=0&navpanes=0"></iframe>
+  </main>
+  <script>
+    (() => {
+      const tabs = [...document.querySelectorAll('.rules-tab')];
+      const docs = [...document.querySelectorAll('.rules-document')];
+      tabs.forEach(tab => tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        docs.forEach(d => d.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.doc).classList.add('active');
+      }));
+    })();
+  </script>
+</body>
+</html>

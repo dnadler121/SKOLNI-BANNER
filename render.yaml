@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: skolni-banner
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt && playwright install chromium
+    startCommand: gunicorn --timeout 120 app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.4
+      - key: SKOLAONLINE_USER
+        sync: false
+      - key: SKOLAONLINE_PASSWORD
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true

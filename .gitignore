@@ -1,0 +1,21 @@
+# Přihlašovací údaje a tajné proměnné
+.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtuální prostředí
+.venv/
+venv/
+
+# VS Code
+.vscode/
+
+# Linux / systémové soubory
+.DS_Store
+
+# Dočasné soubory
+*.log
