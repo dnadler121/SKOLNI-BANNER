@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import re
-from urllib.parse import urljoin
-
-import requests
 from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 from html_timetable import parse_timetable_html
+from settings_store import load_settings, save_settings
 
 TIMETABLE_URL = "https://aplikace.skolaonline.cz/SOL/App/Rozvrh/KRO003_VypisTridy.aspx"
 
@@ -16,171 +14,236 @@ class SkolaOnlineError(RuntimeError):
 
 
 class SkolaOnlineClient:
-    """Serverový klient bez Playwrightu. Čte přímo HTML KRO003."""
+    """Klient Školy Online přes skutečný Chromium prohlížeč (Playwright).
+
+    Na Renderu běží headless Chromium, session/cookies se ukládají přes
+    settings_store do PostgreSQL. Lokálně se použije stejné rozhraní.
+    """
 
     def __init__(self, username: str, password: str):
         self.username = (username or "").strip()
         self.password = password or ""
-        self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:150.0) Gecko/20100101 Firefox/150.0",
-            "Accept-Language": "cs-CZ,cs;q=0.9,en;q=0.7",
-        })
-        self._logged_in = False
 
     @staticmethod
-    def _is_botstopper(response: requests.Response) -> bool:
-        text = response.text[:10000]
-        return bool(re.search(r"BotStopper|Access Denied|Oh noes!", text, re.I))
+    def _browser(pw):
+        return pw.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+        )
 
     @staticmethod
-    def _is_timetable(response: requests.Response) -> bool:
-        return "KRO003_VypisTridy.aspx" in response.url and "CCADynamicCalendarTable" in response.text
+    def _context(browser, state=None):
+        kwargs = dict(
+            locale="cs-CZ",
+            user_agent=(
+                "Mozilla/5.0 (X11; Linux x86_64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/127.0.0.0 Safari/537.36"
+            ),
+            viewport={"width": 1365, "height": 900},
+        )
+        if state:
+            kwargs["storage_state"] = state
+        return browser.new_context(**kwargs)
 
     @staticmethod
-    def _hidden_fields(form):
-        data = {}
-        for el in form.select('input[type="hidden"][name]'):
-            data[el.get("name")] = el.get("value", "")
-        return data
+    def _body_text(page):
+        try:
+            return page.locator("body").inner_text(timeout=5000)
+        except Exception:
+            return ""
+
+    @classmethod
+    def _botstopper(cls, page):
+        text = cls._body_text(page).casefold()
+        return any(x in text for x in ("botstopper", "access denied", "oh noes"))
 
     @staticmethod
-    def _find_login_inputs(form):
-        inputs = form.find_all("input")
-        pass_el = next((x for x in inputs if (x.get("type") or "").lower() == "password" and x.get("name")), None)
-        if pass_el is None:
-            return None, None
-        candidates = []
-        for x in inputs:
-            if not x.get("name"):
-                continue
-            typ = (x.get("type") or "text").lower()
-            if typ not in ("text", "email"):
-                continue
-            ident = " ".join((x.get("name", ""), x.get("id", ""), x.get("placeholder", ""))).casefold()
-            score = sum(5 for k in ("user", "login", "jmeno", "uživ", "email") if k in ident)
-            candidates.append((score, x))
-        return (max(candidates, key=lambda p: p[0])[1] if candidates else None), pass_el
+    def _is_timetable(page):
+        try:
+            return (
+                "KRO003_VypisTridy.aspx".casefold() in (page.url or "").casefold()
+                and page.locator("select#DDLTrida, select[name='DDLTrida']").count() > 0
+            )
+        except Exception:
+            return False
 
-    def login(self, force=False):
-        if self._logged_in and not force:
-            return
+    def _fill_login(self, page):
         if not self.username or not self.password:
-            raise SkolaOnlineError("Nejsou nastavené SKOLAONLINE_USER a SKOLAONLINE_PASSWORD v .env.")
+            raise SkolaOnlineError("V administraci nejsou nastavené údaje Školy Online.")
+
+        pwd = page.locator('input[type="password"]')
+        if not pwd.count():
+            raise SkolaOnlineError(
+                "Škola Online nevrátila rozvrh ani rozpoznatelný přihlašovací formulář."
+            )
+
+        user = None
+        selectors = [
+            'input[name*="user" i]',
+            'input[id*="user" i]',
+            'input[name*="login" i]',
+            'input[id*="login" i]',
+            'input[name*="jmeno" i]',
+            'input[id*="jmeno" i]',
+            'input[type="email"]',
+            'input[type="text"]',
+        ]
+        for sel in selectors:
+            loc = page.locator(sel)
+            if loc.count():
+                user = loc.first
+                break
+        if user is None:
+            raise SkolaOnlineError("Nepodařilo se najít pole pro uživatelské jméno.")
+
+        user.fill(self.username)
+        pwd.first.fill(self.password)
+
+        for sel in (
+            'button:has-text("Přihlásit")',
+            'input[type="submit"]',
+            'button[type="submit"]',
+        ):
+            loc = page.locator(sel)
+            if loc.count():
+                loc.first.click()
+                return
+        pwd.first.press("Enter")
+
+    def _open_logged_page(self, force_login=False):
+        cfg = load_settings()
+        saved_state = None if force_login else cfg.get("skolaonline_storage_state")
+
+        pw = sync_playwright().start()
+        browser = self._browser(pw)
+        context = self._context(browser, saved_state)
+        page = context.new_page()
 
         try:
-            r = self.session.get(TIMETABLE_URL, timeout=25, allow_redirects=True)
-            r.raise_for_status()
-        except requests.RequestException as exc:
-            raise SkolaOnlineError(f"Škola Online není dostupná: {exc}") from exc
+            page.goto(TIMETABLE_URL, wait_until="domcontentloaded", timeout=60000)
+            page.wait_for_timeout(2500)
 
-        if self._is_botstopper(r):
-            raise SkolaOnlineError(
-                "Škola Online zablokovala serverové přihlášení přes BotStopper. "
-                "HTML parser v14 je hotový, ale přihlášení bez prohlížeče tento server momentálně nepovolil."
-            )
-        if self._is_timetable(r):
-            self._logged_in = True
-            return
+            if self._botstopper(page):
+                raise SkolaOnlineError(
+                    "BotStopper zablokoval i skutečný Chromium prohlížeč na Renderu."
+                )
 
-        soup = BeautifulSoup(r.text, "html.parser")
-        login_form = user_el = pass_el = None
-        for form in soup.find_all("form"):
-            u, p = self._find_login_inputs(form)
-            if u is not None and p is not None:
-                login_form, user_el, pass_el = form, u, p
-                break
-        if login_form is None:
-            raise SkolaOnlineError(
-                "Škola Online nevrátila rozvrh ani klasický přihlašovací formulář. "
-                f"Konečná URL: {r.url}"
-            )
+            if not self._is_timetable(page):
+                self._fill_login(page)
+                try:
+                    page.wait_for_load_state("domcontentloaded", timeout=60000)
+                except PlaywrightTimeoutError:
+                    pass
+                page.wait_for_timeout(3500)
 
-        payload = {}
-        for el in login_form.select("input[name]"):
-            typ = (el.get("type") or "text").lower()
-            if typ in ("submit", "button", "image", "file"):
-                continue
-            if typ in ("checkbox", "radio") and not el.has_attr("checked"):
-                continue
-            payload[el["name"]] = el.get("value", "")
-        payload[user_el["name"]] = self.username
-        payload[pass_el["name"]] = self.password
-        submit = login_form.find(["button", "input"], attrs={"type": re.compile("submit", re.I)})
-        if submit and submit.get("name"):
-            payload[submit["name"]] = submit.get("value", "Přihlásit")
+                if self._botstopper(page):
+                    raise SkolaOnlineError(
+                        "BotStopper zablokoval přihlášení i přes Chromium na Renderu."
+                    )
 
-        action = urljoin(r.url, login_form.get("action") or r.url)
-        posted = self.session.post(action, data=payload, timeout=25, allow_redirects=True, headers={"Referer": r.url})
-        posted.raise_for_status()
-        if self._is_botstopper(posted):
-            raise SkolaOnlineError("BotStopper zablokoval odeslání přihlašovacího formuláře.")
+                # Některé přihlášení po POSTu neskončí přímo na KRO003.
+                if not self._is_timetable(page):
+                    page.goto(TIMETABLE_URL, wait_until="domcontentloaded", timeout=60000)
+                    page.wait_for_timeout(1800)
 
-        test = self.session.get(TIMETABLE_URL, timeout=25, allow_redirects=True)
-        test.raise_for_status()
-        if not self._is_timetable(test):
-            raise SkolaOnlineError(f"Přihlášení nebylo dokončeno. Konečná URL: {test.url}")
-        self._logged_in = True
+            if not self._is_timetable(page):
+                raise SkolaOnlineError(
+                    "Přihlášení proběhlo, ale nepodařilo se otevřít stránku rozvrhu KRO003."
+                )
 
-    def _get_page(self):
-        self.login()
-        r = self.session.get(TIMETABLE_URL, timeout=25, allow_redirects=True)
-        r.raise_for_status()
-        if not self._is_timetable(r):
-            self.login(force=True)
-            r = self.session.get(TIMETABLE_URL, timeout=25, allow_redirects=True)
-            r.raise_for_status()
-        if not self._is_timetable(r):
-            raise SkolaOnlineError("Po přihlášení se nepodařilo načíst KRO003 s rozvrhem.")
-        return r
+            cfg = load_settings()
+            cfg["skolaonline_storage_state"] = context.storage_state()
+            save_settings(cfg)
+            return pw, browser, context, page
+        except Exception:
+            context.close()
+            browser.close()
+            pw.stop()
+            raise
 
-    @staticmethod
-    def _class_select(soup):
-        return soup.select_one("select#DDLTrida, select[name='DDLTrida']")
+    def login(self, force=False):
+        pw = browser = context = page = None
+        try:
+            pw, browser, context, page = self._open_logged_page(force_login=force)
+        finally:
+            if context:
+                context.close()
+            if browser:
+                browser.close()
+            if pw:
+                pw.stop()
 
     def get_classes(self):
-        r = self._get_page()
-        soup = BeautifulSoup(r.text, "html.parser")
-        sel = self._class_select(soup)
-        if sel is None:
-            raise SkolaOnlineError("V KRO003 nebyl nalezen seznam tříd DDLTrida.")
-        return [
-            {"name": o.get_text(" ", strip=True), "value": o.get("value", "")}
-            for o in sel.find_all("option") if o.get_text(" ", strip=True) and o.get("value")
-        ]
+        pw = browser = context = page = None
+        try:
+            pw, browser, context, page = self._open_logged_page()
+            html = page.content()
+            soup = BeautifulSoup(html, "html.parser")
+            sel = soup.select_one("select#DDLTrida, select[name='DDLTrida']")
+            if sel is None:
+                raise SkolaOnlineError("V KRO003 nebyl nalezen seznam tříd DDLTrida.")
+            return [
+                {"name": o.get_text(" ", strip=True), "value": o.get("value", "")}
+                for o in sel.find_all("option")
+                if o.get_text(" ", strip=True) and o.get("value")
+            ]
+        finally:
+            if context:
+                context.close()
+            if browser:
+                browser.close()
+            if pw:
+                pw.stop()
 
     def get_timetable(self, class_name: str):
-        r = self._get_page()
-        soup = BeautifulSoup(r.text, "html.parser")
-        sel = self._class_select(soup)
-        if sel is None or not sel.get("name"):
-            raise SkolaOnlineError("V KRO003 nebyl nalezen výběr třídy DDLTrida.")
+        pw = browser = context = page = None
+        try:
+            pw, browser, context, page = self._open_logged_page()
+            select = page.locator("select#DDLTrida, select[name='DDLTrida']").first
 
-        selected = sel.find("option", selected=True)
-        if selected and selected.get_text(" ", strip=True).casefold() == class_name.casefold():
-            return parse_timetable_html(r.text, class_name)
+            options = select.locator("option").all()
+            wanted_value = None
+            for opt in options:
+                label = (opt.inner_text() or "").strip()
+                if label.casefold() == class_name.casefold():
+                    wanted_value = opt.get_attribute("value")
+                    break
 
-        option = next((o for o in sel.find_all("option") if o.get_text(" ", strip=True).casefold() == class_name.casefold()), None)
-        if option is None:
-            raise SkolaOnlineError(f"Třída {class_name} není v nabídce Školy Online.")
+            if not wanted_value:
+                raise SkolaOnlineError(f"Třída {class_name} není v nabídce Školy Online.")
 
-        form = sel.find_parent("form")
-        if form is None:
-            raise SkolaOnlineError("Výběr třídy není uvnitř ASP.NET formuláře.")
+            current = select.input_value()
+            if current != wanted_value:
+                select.select_option(value=wanted_value)
+                # ASP.NET onchange/postback může navigovat nebo pouze překreslit stránku.
+                try:
+                    page.wait_for_load_state("domcontentloaded", timeout=30000)
+                except PlaywrightTimeoutError:
+                    pass
+                page.wait_for_timeout(1800)
 
-        payload = self._hidden_fields(form)
-        # Zachováme aktuálně vybrané hodnoty ostatních selectů.
-        for control in form.select("select[name]"):
-            current = control.find("option", selected=True)
-            if current:
-                payload[control["name"]] = current.get("value", "")
-        payload[sel["name"]] = option.get("value", "")
-        payload["__EVENTTARGET"] = sel["name"]
-        payload["__EVENTARGUMENT"] = ""
+                # Pokud samotné select_option nevyvolalo postback, vyvoláme change ručně.
+                if select.input_value() != wanted_value:
+                    select.evaluate("(el) => el.dispatchEvent(new Event('change', {bubbles:true}))")
+                    try:
+                        page.wait_for_load_state("domcontentloaded", timeout=30000)
+                    except PlaywrightTimeoutError:
+                        pass
+                    page.wait_for_timeout(1200)
 
-        action = urljoin(r.url, form.get("action") or r.url)
-        posted = self.session.post(action, data=payload, timeout=25, allow_redirects=True, headers={"Referer": r.url})
-        posted.raise_for_status()
-        if self._is_botstopper(posted):
-            raise SkolaOnlineError("BotStopper zablokoval POST pro výběr třídy.")
-        return parse_timetable_html(posted.text, class_name)
+            if self._botstopper(page):
+                raise SkolaOnlineError("BotStopper zablokoval načtení vybrané třídy.")
+
+            cfg = load_settings()
+            cfg["skolaonline_storage_state"] = context.storage_state()
+            save_settings(cfg)
+
+            return parse_timetable_html(page.content(), class_name)
+        finally:
+            if context:
+                context.close()
+            if browser:
+                browser.close()
+            if pw:
+                pw.stop()

@@ -141,6 +141,7 @@ def admin():
         action = request.form.get("action")
         if action == "save_skola":
             cfg["skolaonline_user"] = request.form.get("skolaonline_user", "").strip()
+            cfg["skolaonline_storage_state"] = None
             new_password = request.form.get("skolaonline_password", "")
             if new_password:
                 cfg["skolaonline_password"] = new_password
@@ -149,6 +150,7 @@ def admin():
         elif action == "clear_skola":
             cfg["skolaonline_user"] = ""
             cfg["skolaonline_password"] = ""
+            cfg["skolaonline_storage_state"] = None
             save_settings(cfg)
             flash("Účet Školy Online byl odstraněn.", "ok")
         return redirect(url_for("admin"))
@@ -159,6 +161,17 @@ def admin():
         skola_has_password=bool(cfg.get("skolaonline_password") or os.environ.get("SKOLAONLINE_PASSWORD")),
         instagram_profile=profile.exists(),
     )
+
+
+@app.post("/admin/skola-login")
+@admin_required
+def admin_skola_login():
+    try:
+        current_skola_client().login(force=True)
+        flash("Škola Online je přihlášena. Session byla uložena do PostgreSQL.", "ok")
+    except Exception as exc:
+        flash(f"Nepodařilo se přihlásit Školu Online: {exc}", "error")
+    return redirect(url_for("admin"))
 
 @app.post("/admin/instagram-login")
 @admin_required

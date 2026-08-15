@@ -5,7 +5,7 @@ from cryptography.fernet import Fernet, InvalidToken
 
 BASE=Path(__file__).resolve().parent
 DATA_DIR=BASE/"data"; KEY_FILE=DATA_DIR/"banner.key"; SETTINGS_FILE=DATA_DIR/"settings.enc"
-DEFAULTS={"admin_password_hash":"","skolaonline_user":"","skolaonline_password":"","instagram_configured":False,"facebook_configured":False}
+DEFAULTS={"admin_password_hash":"","skolaonline_user":"","skolaonline_password":"","instagram_configured":False,"facebook_configured":False,"skolaonline_storage_state":None}
 
 def _database_url(): return (os.environ.get("DATABASE_URL") or "").strip()
 def _fernet():
