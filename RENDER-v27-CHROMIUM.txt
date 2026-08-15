@@ -1,0 +1,17 @@
+# v27 – Render: Chromium
+
+Chyba `Executable doesn't exist ... ms-playwright ...` znamena, ze Python Playwright je
+nainstalovany, ale chybi jeho Chromium.
+
+Pokud nasazujes sluzbu rucne pres Render Dashboard (ne pres Blueprint), nastav:
+
+Build Command:
+    pip install -r requirements.txt && python -m playwright install chromium
+
+Start Command:
+    bash start-render.sh
+
+Pak dej Manual Deploy -> Clear build cache & deploy.
+
+Soubor `start-render.sh` Chromium pri startu jeste jednou zkontroluje/doinstaluje.
+Playwright je v requirements pripnuty na konkretni verzi, aby se balicek a browser nerozesly.
