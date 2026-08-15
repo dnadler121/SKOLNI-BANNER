@@ -1,0 +1,23 @@
+BANNER v23 – LINUX
+==================
+
+1) Rozbal ZIP.
+2) V terminálu přejdi do složky Banner.
+3) Poprvé spusť:
+   chmod +x SPUSTIT-ADMIN-LINUX.sh SPUSTIT-BANNER-LINUX.sh
+   ./SPUSTIT-ADMIN-LINUX.sh
+4) Ve Firefoxu otevři:
+   http://127.0.0.1:5000/admin
+5) Při první návštěvě vytvoř heslo správce.
+6) V administraci nastav účet Školy Online.
+7) U Instagramu klikni „Otevřít přihlášení Instagramu“, dokonči login a případný ověřovací kód. Pak okno zavři.
+8) Server v terminálu ukonči Ctrl+C.
+9) Pro ostrý kiosk spusť:
+   ./SPUSTIT-BANNER-LINUX.sh
+
+Poznámky:
+- Rozvrhy a jejich vzhled zůstaly stejné jako v dodaném funkčním ZIPu.
+- Hesla správce a služeb se neukládají do zdrojového kódu ani do .env; lokální konfigurace je šifrovaná ve složce data/.
+- Instagram používá vlastní kioskový Chromium profil. Běžný Firefox profil se nemění.
+- V kiosku je Instagram uzamčen na https://www.instagram.com/sssaskv/ a nové karty jsou blokované.
+- Facebook je zatím jen připravený jako další služba; není v této verzi aktivován.

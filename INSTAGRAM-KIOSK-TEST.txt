@@ -1,0 +1,6 @@
+Instagram ve v22:
+- tlačítko Instagram otevírá přímo https://www.instagram.com/sssaskv/
+- žádné stahování 40 příspěvků, žádná lokální kopie Instagramu
+- ve Windows kiosk spuštění lze profil rolovat
+- pokus o Stories / příspěvek / Reel / jiný profil se zablokuje a vrátí na @sssaskv
+- ZPĚT NA BANNER vrací na hlavní obrazovku

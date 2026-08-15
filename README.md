@@ -27,19 +27,3 @@ Veřejná přihlašovací vrstva Školy Online je chráněna BotStopperem. v14 z
 
 ## Instagram nástěnka (v19)
 Tlačítko Instagram načítá na pozadí posledních 40 příspěvků profilu `@sssaskv`, uloží jejich obrázky lokálně a zobrazuje je po 12 (3×4) každých 10 sekund pořád dokola. Fotografie nejsou klikací a z obrazovky vede pouze tlačítko ZPĚT. Cache se obnovuje přibližně jednou za hodinu. Pokud nejsou nastaveny `INSTAGRAM_USER` a `INSTAGRAM_PASSWORD`, použijí se `SKOLAONLINE_USER` a `SKOLAONLINE_PASSWORD`.
-
-## Instagram kiosk (v20)
-Instagram se už nestahuje do lokální cache. Tlačítko **INSTAGRAM** otevře přímo profil `@sssaskv`.
-
-Na kiosk počítači se používá Chromium/Chrome se samostatným trvalým profilem a lokálním rozšířením. Na profilu školy rozšíření:
-- ponechá rolování nahoru/dolů,
-- zablokuje kliknutí na příspěvky, Reels, profily, zprávy a další části Instagramu,
-- přidá zelené tlačítko **← ZPĚT** do školního banneru.
-
-### První přihlášení Instagramu
-Jednou spusťte `./prihlasit_instagram_poprve.sh`, přihlaste školní Instagram a prohlížeč zavřete. Přihlášení zůstane v samostatném kiosk profilu.
-
-### Běžný kiosk provoz
-Spusťte Flask aplikaci jako dosud a potom `./spustit_kiosk.sh`.
-
-Poznámka: blokování kliknutí na Instagramu zajišťuje kiosk rozšíření v prohlížeči. Při běžném otevření aplikace ve Firefoxu bez tohoto rozšíření tato ochrana aktivní není.

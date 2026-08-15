@@ -1,0 +1,9 @@
+TEST KIOSKU NA WINDOWS
+1. Musí být nainstalovaný Python 3 a Google Chrome.
+2. Dvojklik na SPUSTIT-BANNER-WINDOWS.bat.
+3. Při prvním spuštění se vytvoří .venv a nainstalují balíčky; může to chvíli trvat.
+4. Chrome se otevře v kiosk režimu.
+5. Instagram: hlavní profil @sssaskv lze rolovat. Pokus o Stories/Reel/příspěvek/jiný profil se vrátí na @sssaskv.
+6. Tlačítko ← ZPĚT NA BANNER na Instagramu vrací na hlavní banner.
+
+POZNÁMKA: Tato verze je zatím testovací BAT verze před vytvořením EXE.
