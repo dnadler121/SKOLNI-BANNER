@@ -8,3 +8,7 @@ Instagram: lokalni kiosk zustava funkcni. Na Renderu nelze soucasnym Playwright 
 
 ## v25 – Škola Online přes Chromium
 V administraci ulož účet a klikni na `Přihlásit / obnovit session Školy Online`. Chromium běží headless na Renderu; session se uloží šifrovaně do PostgreSQL. Pokud BotStopper blokuje i datacentrové Chromium, administrace vypíše tuto konkrétní chybu.
+
+## v26 – oprava asyncio / Playwright
+Synchronní Chromium běží v samostatném pracovním vlákně. Tím se odstraní chyba
+`Playwright Sync API inside the asyncio loop` na Renderu.

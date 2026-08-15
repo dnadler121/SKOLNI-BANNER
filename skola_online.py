@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 from html_timetable import parse_timetable_html
@@ -162,7 +163,7 @@ class SkolaOnlineClient:
             pw.stop()
             raise
 
-    def login(self, force=False):
+    def _login_worker(self, force=False):
         pw = browser = context = page = None
         try:
             pw, browser, context, page = self._open_logged_page(force_login=force)
@@ -174,7 +175,7 @@ class SkolaOnlineClient:
             if pw:
                 pw.stop()
 
-    def get_classes(self):
+    def _get_classes_worker(self):
         pw = browser = context = page = None
         try:
             pw, browser, context, page = self._open_logged_page()
@@ -196,7 +197,7 @@ class SkolaOnlineClient:
             if pw:
                 pw.stop()
 
-    def get_timetable(self, class_name: str):
+    def _get_timetable_worker(self, class_name: str):
         pw = browser = context = page = None
         try:
             pw, browser, context, page = self._open_logged_page()
@@ -247,3 +248,23 @@ class SkolaOnlineClient:
                 browser.close()
             if pw:
                 pw.stop()
+
+    @staticmethod
+    def _run_worker(func, *args):
+        """Spustí Sync Playwright v novém vlákně.
+
+        Render/ASGI může mít v obslužném vlákně aktivní asyncio loop.
+        Sync Playwright proto musí běžet mimo toto vlákno.
+        """
+        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="skolaonline") as pool:
+            return pool.submit(func, *args).result()
+
+    def login(self, force=False):
+        return self._run_worker(self._login_worker, force)
+
+    def get_classes(self):
+        return self._run_worker(self._get_classes_worker)
+
+    def get_timetable(self, class_name: str):
+        return self._run_worker(self._get_timetable_worker, class_name)
+
