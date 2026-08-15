@@ -3,8 +3,8 @@ services:
     name: skolni-banner
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements.txt && python -m playwright install chromium
-    startCommand: bash start-render.sh
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --timeout 120 app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.4
