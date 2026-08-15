@@ -14,14 +14,12 @@ if not exist ".venv\Scripts\python.exe" (
     call .venv\Scripts\activate.bat
 )
 
-echo.
 python synchronizace_rozvrhu.py
 echo.
 pause
 exit /b 0
 
 :chyba
-echo.
-echo Nepodarilo se najit Python. Nainstalujte Python 3 a pri instalaci zaskrtnete "Add Python to PATH".
+echo Python nebyl nalezen.
 pause
 exit /b 1

@@ -1,6 +1,8 @@
 import os
 import subprocess
 import sys
+import secrets
+from datetime import datetime, timezone
 from functools import wraps
 from pathlib import Path
 from flask import Flask, render_template, jsonify, request, redirect, url_for, session, flash
@@ -70,11 +72,22 @@ def skolni_rady():
 
 @app.get("/api/classes")
 def api_classes():
-    try:
-        classes = current_skola_client().get_classes()
-        return jsonify({"ok": True, "classes": classes})
-    except Exception as exc:
-        return jsonify({"ok": False, "error": str(exc), "classes": [{"name": "BB1A", "value": "BB1A"}]})
+    cfg = load_settings()
+    uploaded = cfg.get("uploaded_timetables") or {}
+    if uploaded:
+        names = sorted(uploaded.keys())
+        return jsonify({
+            "ok": True,
+            "classes": [{"name": n, "value": n} for n in names],
+            "synced": True,
+            "last_sync": cfg.get("timetable_last_sync", "")
+        })
+
+    return jsonify({
+        "ok": True,
+        "classes": [{"name": "BB1A – UKÁZKA", "value": "BB1A"}],
+        "demo": True
+    })
 
 @app.get("/rozvrh/<path:class_name>")
 def timetable(class_name):
@@ -82,11 +95,23 @@ def timetable(class_name):
 
 @app.get("/api/timetable/<path:class_name>")
 def api_timetable(class_name):
+    cfg = load_settings()
+    uploaded = cfg.get("uploaded_timetables") or {}
+    data = uploaded.get(class_name)
+    if data:
+        return jsonify({
+            "ok": True,
+            **data,
+            "synced": True,
+            "last_sync": cfg.get("timetable_last_sync", "")
+        })
+
     try:
-        data = current_skola_client().get_timetable(class_name)
-        return jsonify({"ok": True, **data})
+        html_text = TEST_HTML.read_text(encoding="utf-8", errors="replace")
+        data = parse_timetable_html(html_text, class_name)
+        return jsonify({"ok": True, **data, "test": True, "demo": True})
     except Exception as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 502
+        return jsonify({"ok": False, "error": str(exc)}), 500
 
 @app.get("/api/timetable-test/<path:class_name>")
 def api_timetable_test(class_name):
@@ -96,6 +121,65 @@ def api_timetable_test(class_name):
         return jsonify({"ok": True, **data, "test": True})
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.post("/api/sync/timetables")
+def api_sync_timetables():
+    cfg = load_settings()
+    expected = (cfg.get("sync_token") or "").strip()
+    supplied = (request.headers.get("X-Banner-Sync-Token") or "").strip()
+
+    if not expected or not supplied or not secrets.compare_digest(expected, supplied):
+        return jsonify({"ok": False, "error": "Neplatný synchronizační klíč."}), 401
+
+    payload = request.get_json(silent=True) or {}
+    timetables = payload.get("timetables")
+
+    if not isinstance(timetables, dict) or not timetables:
+        return jsonify({"ok": False, "error": "Nebyla přijata žádná data rozvrhů."}), 400
+
+    clean = {}
+    for class_name, data in timetables.items():
+        if not isinstance(class_name, str) or not isinstance(data, dict):
+            continue
+        name = class_name.strip()
+        if name and isinstance(data.get("days"), list):
+            clean[name] = data
+
+    if not clean:
+        return jsonify({"ok": False, "error": "Data rozvrhů nemají správný formát."}), 400
+
+    cfg["uploaded_timetables"] = clean
+    cfg["timetable_last_sync"] = datetime.now(timezone.utc).isoformat()
+    save_settings(cfg)
+
+    return jsonify({
+        "ok": True,
+        "classes": len(clean),
+        "last_sync": cfg["timetable_last_sync"]
+    })
+
+
+@app.post("/admin/new-sync-token")
+@admin_required
+def admin_new_sync_token():
+    cfg = load_settings()
+    cfg["sync_token"] = secrets.token_urlsafe(32)
+    save_settings(cfg)
+    flash("Byl vytvořen nový synchronizační klíč.", "ok")
+    return redirect(url_for("admin"))
+
+
+@app.post("/admin/clear-timetables")
+@admin_required
+def admin_clear_timetables():
+    cfg = load_settings()
+    cfg["uploaded_timetables"] = {}
+    cfg["timetable_last_sync"] = ""
+    save_settings(cfg)
+    flash("Nahrané rozvrhy byly odstraněny. Zobrazuje se ukázkový rozvrh.", "ok")
+    return redirect(url_for("admin"))
+
 
 @app.route("/admin/setup", methods=["GET", "POST"])
 def admin_setup():

@@ -4,19 +4,22 @@
 
 <div class="card">
   <h2>Synchronizace aktuálního týdne</h2>
-  <p class="muted">Render se už nepřihlašuje do Školy Online. Aktuální týden nahraje lokální aktualizátor ze školní sítě.</p>
-  <p><strong>Poslední synchronizace:</strong> {{ cfg.get("timetable_last_sync") or "zatím žádná – používá se ukázkový rozvrh" }}</p>
+  <p class="muted">Aktuální rozvrhy nahraje lokální aktualizátor ze školní sítě. Render se do Školy Online nepřihlašuje.</p>
+  <p><strong>Poslední synchronizace:</strong> {{ cfg.get("timetable_last_sync") or "zatím žádná – zobrazuje se ukázkový rozvrh" }}</p>
+
   {% if cfg.get("sync_token") %}
     <label>Synchronizační klíč</label>
     <input type="text" value="{{ cfg.get('sync_token') }}" readonly onclick="this.select()">
   {% else %}
-    <p>Nejdřív vytvoř synchronizační klíč.</p>
+    <p>Synchronizační klíč zatím není vytvořen.</p>
   {% endif %}
-  <form method="post" action="/admin/new-sync-token" style="margin-top:10px">
-    <button>Vytvořit nový synchronizační klíč</button>
+
+  <form method="post" action="{{ url_for('admin_new_sync_token') }}" style="margin-top:10px">
+    <button type="submit">Vytvořit nový synchronizační klíč</button>
   </form>
-  <form method="post" action="/admin/clear-timetables" style="margin-top:10px">
-    <button>Vrátit ukázkový rozvrh</button>
+
+  <form method="post" action="{{ url_for('admin_clear_timetables') }}" style="margin-top:10px">
+    <button type="submit">Vrátit ukázkový rozvrh</button>
   </form>
 </div>
 
