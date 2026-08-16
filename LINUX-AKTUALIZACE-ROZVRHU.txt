@@ -1,0 +1,27 @@
+LINUX – AKTUALIZACE ROZVRHU
+
+1. Rozbal ZIP.
+2. Otevri terminal ve slozce Banner.
+3. Jednou spust:
+
+   chmod +x AKTUALIZOVAT-ROZVRHY-LINUX.sh
+
+4. Potom spust:
+
+   ./AKTUALIZOVAT-ROZVRHY-LINUX.sh
+
+Pri prvnim spusteni:
+- vytvori se .venv,
+- nainstaluji se balicky,
+- stahne se Chromium pro Playwright,
+- program se zepta na:
+  - adresu Render banneru,
+  - synchronizacni klic z /admin,
+  - login Skola Online,
+  - heslo Skola Online.
+
+Pri dalsim spusteni uz se pouzije ulozeny sync_config.env.
+
+Soubor AKTUALIZOVAT-ROZVRHY.desktop je pripraven jako graficky spoustec.
+Nektera linuxova prostredi vyzaduji kliknout pravym tlacitkem a povolit "Spustit jako program"
+nebo "Allow Launching".

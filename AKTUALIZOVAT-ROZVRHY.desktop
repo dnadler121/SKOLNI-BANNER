@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Aktualizovat rozvrhy
+Comment=Stahne aktualni tyden ze Skoly Online a odesle jej na Render
+Exec=bash -lc 'cd "$(dirname "%k")" && ./AKTUALIZOVAT-ROZVRHY-LINUX.sh'
+Terminal=true
+Icon=utilities-terminal
+Categories=Utility;
