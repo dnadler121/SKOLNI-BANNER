@@ -7,4 +7,3 @@ beautifulsoup4>=4.12,<5
 cryptography>=42,<47
 
 psycopg[binary]>=3.2,<4
-playwright==1.55.0

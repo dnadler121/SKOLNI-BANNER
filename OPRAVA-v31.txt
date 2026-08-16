@@ -1,0 +1,6 @@
+BANNER v31 – opravená stabilní verze
+- Render pouze zobrazuje synchronizované rozvrhy; do Školy Online se nepřihlašuje.
+- Opraveno lokální přihlášení: tlačítko btnLogin už nelze zaměnit za pole uživatelského jména.
+- Odstraněny staré testovací ovládací prvky z rozvrhu.
+- Render requirements už neinstaluje Playwright; Playwright zůstává jen v requirements-sync.txt pro Linux aktualizátor.
+- Synchronizace dál používá stejný BANNER_SYNC_TOKEN ze sync_config.env.

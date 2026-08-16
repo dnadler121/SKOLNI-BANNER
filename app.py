@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from html_timetable import parse_timetable_html
-from skola_online import SkolaOnlineClient
 from settings_store import load_settings, save_settings
 
 load_dotenv()
@@ -36,8 +35,10 @@ app.config["SECRET_KEY"] = _secret_key()
 
 
 def current_skola_client():
+    # Import je záměrně až zde. Web na Renderu Playwright nepotřebuje;
+    # rozvrhy přijímá z lokálního synchronizátoru.
+    from skola_online import SkolaOnlineClient
     cfg = load_settings()
-    # Kvůli zpětné kompatibilitě funguje i původní .env.
     user = cfg.get("skolaonline_user") or os.environ.get("SKOLAONLINE_USER", "")
     password = cfg.get("skolaonline_password") or os.environ.get("SKOLAONLINE_PASSWORD", "")
     return SkolaOnlineClient(username=user, password=password)
@@ -105,6 +106,11 @@ def api_timetable(class_name):
             "synced": True,
             "last_sync": cfg.get("timetable_last_sync", "")
         })
+
+    # Pokud už jsou synchronizované rozvrhy nahrané, nevracíme pro neznámou
+    # třídu ukázková data. Tím se zabrání matoucímu zobrazení jiné třídy.
+    if uploaded:
+        return jsonify({"ok": False, "error": f"Rozvrh třídy {class_name} nebyl v poslední synchronizaci nalezen."}), 404
 
     try:
         html_text = TEST_HTML.read_text(encoding="utf-8", errors="replace")

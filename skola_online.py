@@ -79,24 +79,39 @@ class SkolaOnlineClient:
                 "Škola Online nevrátila rozvrh ani rozpoznatelný přihlašovací formulář."
             )
 
+        # Hledáme pouze skutečně editovatelná textová pole. Původní selektor
+        # input[id*="login"] mohl omylem vybrat tlačítko btnLogin (type=submit).
+        candidates = page.locator(
+            'input:not([type]), input[type="text"], input[type="email"], '
+            'input[type="tel"], input[type="search"]'
+        )
         user = None
-        selectors = [
-            'input[name*="user" i]',
-            'input[id*="user" i]',
-            'input[name*="login" i]',
-            'input[id*="login" i]',
-            'input[name*="jmeno" i]',
-            'input[id*="jmeno" i]',
-            'input[type="email"]',
-            'input[type="text"]',
-        ]
-        for sel in selectors:
-            loc = page.locator(sel)
-            if loc.count():
-                user = loc.first
-                break
+        preferred = []
+        fallback = []
+        for i in range(candidates.count()):
+            loc = candidates.nth(i)
+            try:
+                if not loc.is_visible() or not loc.is_enabled():
+                    continue
+                ident = " ".join(filter(None, [
+                    loc.get_attribute("name"),
+                    loc.get_attribute("id"),
+                    loc.get_attribute("placeholder"),
+                    loc.get_attribute("autocomplete"),
+                ])).casefold()
+                if any(k in ident for k in ("user", "login", "jmeno", "uživ", "email")):
+                    preferred.append(loc)
+                else:
+                    fallback.append(loc)
+            except Exception:
+                continue
+
+        if preferred:
+            user = preferred[0]
+        elif fallback:
+            user = fallback[0]
         if user is None:
-            raise SkolaOnlineError("Nepodařilo se najít pole pro uživatelské jméno.")
+            raise SkolaOnlineError("Nepodařilo se najít editovatelné pole pro uživatelské jméno.")
 
         user.fill(self.username)
         pwd.first.fill(self.password)
